@@ -632,7 +632,7 @@ class UIWorker(LLMContextWorker):
         target = self._text(message, "target")
         value = payload.get("value")
         try:
-            answer = await self._screen(action, target, str(value) if value else None)
+            answer = await self._screen(action, target, str(value) if value is not None else None)
         except (ClassifierError, ValueError) as e:
             logger.warning(f"{self.name}: screen {action!r} failed: {e}")
             await self.send_job_response(message.job_id, {"error": str(e)}, status=JobStatus.ERROR)
