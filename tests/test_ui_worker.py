@@ -1147,6 +1147,13 @@ class TestUIWorkerScreenJobs(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent.command_name, "set_input_value")
         self.assertEqual((sent.payload["ref"], sent.payload["value"]), ("e6", "hi"))
 
+    async def test_act_writes_a_zero_value_into_an_input(self):
+        worker, _ = await self._worker(choice="e6")
+        await worker._screen_job(_job("screen", {"action": "fill", "target": "Taylor", "value": 0}))
+        sent = worker.send_bus_message.await_args.args[0]
+        self.assertEqual(sent.command_name, "set_input_value")
+        self.assertEqual((sent.payload["ref"], sent.payload["value"]), ("e6", "0"))
+
     async def test_act_with_an_unknown_action_is_a_value_error(self):
         worker, _ = await self._worker()
         with self.assertRaises(ValueError):
