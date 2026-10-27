@@ -32,6 +32,7 @@ resolves and converts in one step right before each completion — see
 import asyncio
 import base64
 import ipaddress
+from urllib.parse import unquote_to_bytes
 
 import aiohttp
 
@@ -244,9 +245,17 @@ class FileResolver:
 
     @staticmethod
     def _decode_data_url(url: str) -> bytes:
+        # RFC 2397: ``data:[<mediatype>][;base64],<data>``. The ``;base64``
+        # marker is optional; without it the payload is percent-encoded text,
+        # not base64. Split on the first comma so a payload that happens to
+        # contain "base64," is still decoded as text.
+        header, separator, payload = url.partition(",")
+        if not separator:
+            raise FileResolverError(f"Malformed data URL: {url!r} has no ','")
         try:
-            _, encoded = url.split("base64,", 1)
-            return base64.b64decode(encoded)
+            if header.lower().endswith(";base64"):
+                return base64.b64decode(payload)
+            return unquote_to_bytes(payload)
         except (ValueError, TypeError) as e:
             raise FileResolverError(f"Malformed data URL: {e}") from e
 

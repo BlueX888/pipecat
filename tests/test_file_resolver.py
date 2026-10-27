@@ -9,6 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
+from urllib.parse import quote_from_bytes
 
 from pipecat.adapters.llm.base_llm_adapter import LLMContextConversionError
 from pipecat.adapters.llm.services.anthropic_adapter import AnthropicLLMAdapter
@@ -80,6 +81,39 @@ class TestFileResolverFetch(unittest.IsolatedAsyncioTestCase):
         resolver = FileResolver()
         with self.assertRaises(FileResolverError):
             await resolver.fetch("data:application/pdf;base64")
+
+    async def test_data_url_without_base64_marker_is_percent_decoded(self):
+        raw = b"Hello world"
+        encoded = quote_from_bytes(raw)
+        resolver = FileResolver()
+        result = await resolver.fetch(f"data:text/plain,{encoded}")
+        self.assertEqual(result, raw)
+
+    async def test_data_url_plain_text_payload_is_decoded(self):
+        resolver = FileResolver()
+        result = await resolver.fetch("data:application/json,%7B%22a%22%3A1%7D")
+        self.assertEqual(result, b'{"a":1}')
+
+    async def test_data_url_payload_mentioning_base64_stays_text(self):
+        # A non-base64 payload that contains the literal "base64," must be
+        # decoded as text, not split on that substring.
+        resolver = FileResolver()
+        result = await resolver.fetch("data:text/plain,see base64, docs")
+        self.assertEqual(result, b"see base64, docs")
+
+    async def test_data_url_base64_marker_after_parameters(self):
+        raw = b"hello"
+        b64 = base64.b64encode(raw).decode()
+        resolver = FileResolver()
+        result = await resolver.fetch(f"data:text/plain;charset=utf-8;base64,{b64}")
+        self.assertEqual(result, raw)
+
+    async def test_data_url_base64_marker_is_case_insensitive(self):
+        raw = b"hello"
+        b64 = base64.b64encode(raw).decode()
+        resolver = FileResolver()
+        result = await resolver.fetch(f"data:text/plain;BASE64,{b64}")
+        self.assertEqual(result, raw)
 
     # -- http(s) URLs -----------------------------------------------------------
 
